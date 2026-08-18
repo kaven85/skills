@@ -1,5 +1,9 @@
 # Local CodeGraph index — machine-local, never committed
 .codegraph/
 
+# skill-up 评测资产与运行产物
+evals/
+*-workspace/
+
 # OS / editor noise
 .DS_Store
