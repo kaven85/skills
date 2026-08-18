@@ -32,38 +32,40 @@ This skill is the **workflow conductor** — it defines the sequence and decisio
 ## Full Workflow
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "-apple-system, 'PingFang SC', 'Segoe UI', sans-serif", "fontSize": "14px", "lineColor": "#64748b", "primaryTextColor": "#1f2937", "edgeLabelBackground": "#ffffff", "clusterBkg": "#f8fafc", "clusterBorder": "#cbd5e1"}, "flowchart": {"curve": "basis", "nodeSpacing": 45, "rankSpacing": 55}}}%%
 flowchart TD
-    A([User: "commit code"]) --> B[git status]
-    B --> C[git diff --stat]
-    C --> D{有未提交改动?}
-    D -->|否| Z([无事可做])
-    D -->|是| E{Safe?}
-    E -->|危险操作| E1[git-guardrails 拦截]
-    E1 --> Z
-    E -->|安全| F[Review diff 理解变更]
-    F --> G{变更规模?}
-    G -->|大 / 跨模块| G1[code-review → 修反馈]
-    G1 --> H
-    G -->|小 / 明确| H[检查版本号 + CHANGELOG]
-    H --> I[Stage 代码 + 文档]
-    I --> J[排除 artifacts]
-    J --> K[跑测试门禁]
-    K -->|失败| K1[修 bug 重跑]
-    K1 --> K
-    K -->|全绿| L{多个逻辑变更?}
-    L -->|是| L1[拆分提交]
-    L1 --> M
-    L -->|否| M[写 commit message]
-    M --> N[git commit]
-    N --> O{推送前需确认?}
-    O -->|共享分支 / 生产| O1[问用户确认]
-    O1 --> P
-    O -->|个人分支| P[git push]
-    P -->|冲突| P1[resolving-merge-conflicts]
-    P1 --> P
-    P -->|成功| Q([完成])
-    P -->|需创建 MR| R[提示创建 MR]
-    R --> Q
+    A(["User: commit code"]):::success --> B["Inspect status + diff"]:::primary
+    B --> C{"Changes?"}:::warning
+    C -->|"No"| Z(["Nothing to commit"]):::neutral
+    C -->|"Yes"| D{"Safe operation?"}:::warning
+    D -->|"Dangerous"| D1[["git-guardrails"]]:::external
+    D1 --> Z
+    D -->|"Safe"| E["Review diff"]:::primary
+    E --> F{"Large change?"}:::warning
+    F -->|"Yes"| F1[["code-review + fixes"]]:::external
+    F1 --> G["Version + CHANGELOG"]:::primary
+    F -->|"No"| G
+    G --> H["Stage, exclude artifacts"]:::primary
+    H --> I{"Gate passes?"}:::warning
+    I -->|"No"| I1["Fix + rerun"]:::danger
+    I1 -.-> I
+    I -->|"Yes"| J["Message + git commit"]:::primary
+    J --> K{"Push needs confirmation?"}:::warning
+    K -->|"Yes"| K1["Ask user"]:::warning
+    K1 --> L["git push"]:::primary
+    K -->|"No"| L
+    L -->|"Conflict"| L1[["resolving-merge-conflicts"]]:::external
+    L1 -.-> L
+    L -->|"MR needed"| M["Prompt MR"]:::neutral
+    L -->|"Done"| N(["Done"]):::success
+    M --> N
+
+    classDef primary  fill:#dae8fc,stroke:#6c8ebf,stroke-width:1.5px,color:#1f2937;
+    classDef success  fill:#d5e8d4,stroke:#82b366,stroke-width:1.5px,color:#1f2937;
+    classDef warning  fill:#fff2cc,stroke:#d6b656,stroke-width:1.5px,color:#1f2937;
+    classDef danger   fill:#f8cecc,stroke:#b85450,stroke-width:1.5px,color:#1f2937;
+    classDef neutral  fill:#f5f5f5,stroke:#666666,stroke-width:1.2px,color:#374151;
+    classDef external fill:#e1d5e7,stroke:#9673a6,stroke-width:1.5px,color:#1f2937;
 ```
 
 ## Stage 0: Pre-flight checks
