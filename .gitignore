@@ -1,0 +1,5 @@
+# Local CodeGraph index — machine-local, never committed
+.codegraph/
+
+# OS / editor noise
+.DS_Store

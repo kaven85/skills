@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mermaid Diagram Generator"
+  short_description: "Beautiful, consistently-styled Mermaid diagrams"
+  default_prompt: "Use $mermaid-diagram-generator to draw a styled architecture diagram in Mermaid for my system."
