@@ -6,7 +6,7 @@ description: >
   to caveman-commit and dangerous ops to git-guardrails. Works for any git repo.
   Use when user says: commit code, 提交代码, submit, bump version, 升级版本号,
   update changelog, push, release, 发布.
-version: 1.2.0
+version: 1.3.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -177,7 +177,27 @@ Tests: **One change should have one message that explains it.** A commit titled 
 
 ## Stage 3: Test Gate
 
-Run the relevant tests before committing. Never commit code that breaks tests.
+Classify the change before choosing verification. Do not run TDD or a full test suite by default.
+
+Before running any verification command, output this decision record:
+
+```text
+改动类型: <functional | non-functional | unclear>
+判断依据: <从 diff 中观察到的具体行为或文件改动>
+选用的验证门禁: <TDD verification | 最小相关回归/构建/类型检查/lint | 轻量文档或配置检查>
+```
+
+Use `functional` only when the diff changes user-observable behavior. Use `non-functional` for behavior-preserving, documentation, metadata, build, CI, or configuration changes. If the evidence is insufficient, use `unclear`, explain what is missing, and ask the user to classify it before running verification.
+
+| Change type | Required verification |
+|---|---|
+| Functional `feat` / `fix` that changes user-observable behavior | **TDD verification required.** Explicitly state that TDD applies, confirm a focused behavior test was added or updated, exercise the affected public behavior, and run the smallest relevant test command. During implementation, use the red → green loop: write the failing test first, then make it pass. |
+| `refactor`, `perf`, `build`, `ci`, or dependency changes with no intended behavior change | No TDD requirement. Run only the smallest relevant regression, build, type-check, lint, or configuration validation. |
+| `docs`, `style`, `chore`, metadata, or changelog-only changes | No TDD requirement. Run a lightweight applicable check (for example Markdown lint, schema validation, or a diff review); if none exists, record that no automated check applies. |
+
+Never commit code that breaks an applicable check. If the change classification is unclear, ask the user before selecting a test gate.
+
+When describing a verification plan, label the functional path as “TDD verification” and distinguish it from lightweight non-functional checks. This makes the selected gate auditable before any command runs.
 
 ```bash
 # Python
@@ -201,15 +221,37 @@ python3 -c "from scripts.mymodule import something; something()"
 
 **Rules:**
 - If tests fail, diagnose and fix before committing. Do not commit with "tests will be fixed later"
-- For new code, verify the existing tests still pass
-- For bug fixes, confirm the fix resolves the reproduction case
-- Only run the relevant test suite, not the entire project CI
+- For functional changes, confirm the focused test covers the intended behavior or bug reproduction
+- For non-functional changes, do not add a TDD gate solely because files changed
+- Only run the relevant, smallest verification; do not run the entire project CI by default
 
 ## Stage 4: Commit Message
 
 ### 4.1 Generate the message
 
 **Delegate to `caveman-commit` for the base format.** It covers: type/scope/subject format, subject line rules (imperative mood, ≤72 chars, no trailing period), body rules (only for why, wrap at 72, `Closes #42`), breaking change format (`!` + `BREAKING CHANGE:`), and the NEVER list. Load it before generating the message.
+
+### 4.1.1 Conventional Commits 1.0.0 baseline
+
+Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) as the canonical message format unless the project documents a stricter convention (for example, `commitlint`).
+
+```text
+<type>[optional scope][!]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+Rules required by the specification:
+- `type` is required and must be a noun. Use `feat` for a new feature and `fix` for a bug fix; project-specific additional types are allowed.
+- `scope` is optional and, when present, is a parenthesized noun that identifies a codebase area: `feat(auth): add passkey login`.
+- The `:` and following single space are required; the short description starts immediately after them.
+- A body is optional, free-form, and starts one blank line after the description.
+- Footers are optional and start one blank line after the body (or description). Use either `Token: value` or `Token #value`; footer tokens use hyphens instead of spaces, except `BREAKING CHANGE`.
+- A breaking change must use `!` immediately before `:` and/or an uppercase `BREAKING CHANGE: <description>` footer. `BREAKING-CHANGE:` is equivalent as a footer token.
+
+SemVer guidance from the specification: `fix` normally maps to PATCH, `feat` to MINOR, and any breaking change to MAJOR. Do not infer a release bump when project-specific release tooling defines a different policy.
 
 ### 4.2 Additional rules (not covered by caveman-commit)
 
@@ -267,6 +309,8 @@ body line 2"
 
 Personal feature branches can be pushed without confirmation (unless guarded by `git-guardrails`).
 
+For every listed operation, state the exact operation and ask a direct question such as: “`main` is a shared branch. Do you want me to run `git push origin main`?” Do not run the command until the user gives an affirmative answer. This confirmation gate also applies when explaining a plan: explicitly identify the confirmation required before the later command.
+
 ### 6.2 Push
 ```bash
 git push origin <branch>
@@ -295,7 +339,9 @@ A release is a specific type of commit with:
 # Standard release
 git add VERSION CHANGELOG.md
 git commit -m "chore: release vX.Y.Z"
+# Ask the user before creating a tag.
 git tag vX.Y.Z               # optional — check project convention
+# Ask the user again before pushing main or the tag.
 git push origin main
 git push origin vX.Y.Z        # if tag was created
 ```
